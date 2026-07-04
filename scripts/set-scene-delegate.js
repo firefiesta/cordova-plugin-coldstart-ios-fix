@@ -28,12 +28,20 @@ const fs = require('fs');
 const path = require('path');
 
 // Matches: <key>UISceneDelegateClassName</key> ... <string>XYZ.SceneDelegate</string>
-// Captures the module-name prefix so we can rebuild "<prefix>.AppSceneDelegate".
-// Only matches entries still pointing at the default "*.SceneDelegate" class,
-// so re-running this hook (or running it after it already patched the file)
-// is a no-op instead of double-appending "AppSceneDelegate.AppSceneDelegate".
+// or just <string>SceneDelegate</string> without a module prefix.
+// Captures the (optional) module-name prefix so we can rebuild
+// "<prefix>AppSceneDelegate". Only matches entries still pointing at the
+// default "SceneDelegate" class, so re-running this hook (or running it
+// after it already patched the file) is a no-op instead of double-appending
+// "AppSceneDelegateSceneDelegate".
 const SCENE_DELEGATE_PATTERN =
-    /(<key>\s*UISceneDelegateClassName\s*<\/key>\s*<string>)([^<]*?)\.SceneDelegate(\s*<\/string>)/g;
+    /(<key>\s*UISceneDelegateClassName\s*<\/key>\s*<string>)((?:[^<]*?\.)?)SceneDelegate(\s*<\/string>)/g;
+
+// Diagnostic-only: finds the UISceneDelegateClassName key regardless of
+// what its value is, so we can log it when the patch above doesn't match
+// anything — instead of guessing blind at the plist's exact shape.
+const SCENE_DELEGATE_DIAGNOSTIC_PATTERN =
+    /<key>\s*UISceneDelegateClassName\s*<\/key>\s*<string>([^<]*)<\/string>/;
 
 module.exports = function (context) {
     const projectRoot = context.opts.projectRoot;
@@ -53,16 +61,26 @@ module.exports = function (context) {
     const original = fs.readFileSync(infoPlistPath, 'utf8');
     let matchCount = 0;
 
-    const patched = original.replace(SCENE_DELEGATE_PATTERN, (full, prefix, moduleName, suffix) => {
+    const patched = original.replace(SCENE_DELEGATE_PATTERN, (full, prefix, modulePrefix) => {
         matchCount++;
-        return `${prefix}${moduleName}.AppSceneDelegate${suffix}`;
+        return `${prefix}${modulePrefix}AppSceneDelegate</string>`;
     });
 
     if (matchCount === 0) {
-        console.log(
-            '[cordova-plugin-coldstart-ios-fix] No "*.SceneDelegate" entry found in Info.plist ' +
-            '(already patched, or an unexpected Info.plist structure) — no changes made.'
-        );
+        const diagnostic = original.match(SCENE_DELEGATE_DIAGNOSTIC_PATTERN);
+        if (diagnostic) {
+            console.log(
+                '[cordova-plugin-coldstart-ios-fix] Found UISceneDelegateClassName but the ' +
+                'pattern didn\'t match. Current value: "' + diagnostic[1] + '". ' +
+                'This likely means the value is already patched, or Info.plist uses a shape ' +
+                'this hook doesn\'t recognise yet — please report this value in an issue.'
+            );
+        } else {
+            console.log(
+                '[cordova-plugin-coldstart-ios-fix] No UISceneDelegateClassName key found at all ' +
+                'in Info.plist — the Scene manifest may be structured differently than expected.'
+            );
+        }
         return;
     }
 
