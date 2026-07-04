@@ -158,14 +158,39 @@ device):
 
 ## How it works under the hood
 
-See [`src/ios/AppSceneDelegate.swift`](./src/ios/AppSceneDelegate.swift)
-and [`src/ios/ColdStartIosFix.swift`](./src/ios/ColdStartIosFix.swift) —
-both are short and commented in detail.
+See [`src/ios/AppSceneDelegate.swift`](./src/ios/AppSceneDelegate.swift) and
+[`src/ios/ColdStartIosFix.swift`](./src/ios/ColdStartIosFix.swift) — both are
+short and commented in detail.
 
-The plugin uses `edit-config` to point your app's
-`UISceneDelegateClassName` (in `Info.plist`) at `AppSceneDelegate`
-instead of the default generated `SceneDelegate`. Since
-`AppSceneDelegate` subclasses `CDVSceneDelegate` and calls `super` in
+The plugin ships an `after_prepare` hook
+([`scripts/set-scene-delegate.js`](./scripts/set-scene-delegate.js)) that
+rewrites `UISceneDelegateClassName` directly in the generated `Info.plist`
+after every `cordova prepare`, pointing it at `AppSceneDelegate` instead of
+the default generated `SceneDelegate`.
+
+This is **not** done via a declarative `<edit-config>`, on purpose:
+`UISceneDelegateClassName` lives inside a plist **array**
+(`UIApplicationSceneManifest.UISceneConfigurations.UIWindowSceneSessionRoleApplication[0]`),
+and Cordova's `edit-config`/`config-file` machinery cannot reliably patch a
+value inside a plist array — indexed target paths aren't resolved, and
+array changes get merged/concatenated rather than overwritten. This is a
+long-standing, acknowledged limitation, not a guess — see
+[apache/cordova-ios#613](https://github.com/apache/cordova-ios/issues/613)
+and [CB-13496](https://issues.apache.org/jira/browse/CB-13496). The hook
+sidesteps it entirely by reading and rewriting the compiled plist with the
+[`plist`](https://www.npmjs.com/package/plist) npm package (declared as a
+dependency in this plugin's `package.json`, so Cordova installs it
+automatically when the plugin is added).
+
+The hook is idempotent — it only touches entries still pointing at the
+default `*.SceneDelegate` class name, so running `cordova prepare` multiple
+times, or combining this plugin with another one that also touches Scene
+config, won't cause duplicate or conflicting rewrites (though if another
+plugin also needs to customize `UISceneDelegateClassName`, only one of the
+two will "win" — there's no dependency-injection mechanism here, just a
+straight rewrite).
+
+Since `AppSceneDelegate` subclasses `CDVSceneDelegate` and calls `super` in
 every overridden method, it's safe to combine with other plugins that
 don't also try to replace the Scene Delegate class.
 
@@ -181,6 +206,8 @@ Issues and PRs welcome — in particular:
 
 **Custom URL scheme / file-open cold-start bug (what this plugin fixes):**
 - [apache/cordova-ios#1671 — the upstream issue this plugin implements the workaround for](https://github.com/apache/cordova-ios/issues/1671)
+- [apache/cordova-ios#613 — arrays in plist files can not be adjusted with edit-config (why this plugin uses a hook, not edit-config, to set the Scene Delegate class)](https://github.com/apache/cordova-ios/issues/613)
+- [CB-13496 / apache/cordova-common@9c6cda3 — plist edit-config only supports merges of whole objects/arrays](https://issues.apache.org/jira/browse/CB-13496)
 - [apache/cordova-ios releases](https://github.com/apache/cordova-ios/releases)
 - [Cordova iOS 8.0.0 announcement — introduces `CDVSceneDelegate`](https://cordova.apache.org/announcements/2025/11/23/cordova-ios-8.0.0.html)
 - [Cordova iOS 8.0.1 announcement — unrelated fixes, does not touch this bug](https://cordova.apache.org/announcements/2026/03/12/cordova-ios-8.0.1.html)

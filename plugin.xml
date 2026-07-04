@@ -41,12 +41,15 @@
             the cold-launch URL. AppSceneDelegate itself subclasses
             CDVSceneDelegate and calls super, so all normal Cordova Scene
             behaviour is preserved.
+
+            NOTE: this is done via an after_prepare hook, not <edit-config>.
+            edit-config cannot reliably patch a value living inside a plist
+            array (UISceneDelegateClassName sits inside
+            UIWindowSceneSessionRoleApplication[0]) — see
+            apache/cordova-ios#613 / CB-13496. Indexed target paths are not
+            resolved, and array merges concatenate rather than overwrite.
         -->
-        <edit-config target="UIApplicationSceneManifest/UISceneConfigurations/UIWindowSceneSessionRoleApplication/0/UISceneDelegateClassName"
-                     file="*-Info.plist"
-                     mode="merge">
-            <string>$(PRODUCT_MODULE_NAME).AppSceneDelegate</string>
-        </edit-config>
+        <hook type="after_prepare" src="scripts/set-scene-delegate.js" />
 
     </platform>
 
