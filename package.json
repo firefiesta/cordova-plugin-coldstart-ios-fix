@@ -1,0 +1,33 @@
+{
+  "name": "cordova-plugin-coldstart-ios-fix",
+  "version": "1.0.0",
+  "description": "Fixes the cordova-ios cold-start bug where a custom URL scheme / Universal Link open is dropped because SceneDelegate receives the launch URL before Cordova's open-URL observer is registered.",
+  "cordova": {
+    "id": "cordova-plugin-coldstart-ios-fix",
+    "platforms": [
+      "ios"
+    ]
+  },
+  "keywords": [
+    "cordova",
+    "ecosystem:cordova",
+    "cordova-ios",
+    "ios",
+    "scenedelegate",
+    "coldstart",
+    "deeplink",
+    "openurl",
+    "universallink",
+    "customurlscheme"
+  ],
+  "author": "firefiesta",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/firefiesta/cordova-plugin-coldstart-ios-fix.git"
+  },
+  "bugs": {
+    "url": "https://github.com/firefiesta/cordova-plugin-coldstart-ios-fix/issues"
+  },
+  "homepage": "https://github.com/firefiesta/cordova-plugin-coldstart-ios-fix#readme"
+}

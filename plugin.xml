@@ -1,0 +1,53 @@
+<?xml version='1.0' encoding='utf-8'?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        id="cordova-plugin-coldstart-ios-fix"
+        version="1.0.0">
+
+    <name>ColdStartIosFix</name>
+
+    <description>
+        Fixes the cordova-ios cold-start bug (Scene lifecycle) where a
+        custom URL scheme / Universal Link open is silently dropped because
+        SceneDelegate receives the launch URL before Cordova's own open-URL
+        observer is registered. See apache/cordova-ios#1671.
+    </description>
+
+    <license>MIT</license>
+    <keywords>cordova,ios,scenedelegate,coldstart,deeplink,openurl,universallink,customurlscheme</keywords>
+    <repo>https://github.com/firefiesta/cordova-plugin-coldstart-ios-fix.git</repo>
+    <issue>https://github.com/firefiesta/cordova-plugin-coldstart-ios-fix/issues</issue>
+
+    <engines>
+        <engine name="cordova-ios" version=">=8.0.0" />
+    </engines>
+
+    <js-module src="www/ColdStartIosFix.js" name="ColdStartIosFix">
+        <clobbers target="cordova.plugins.coldStartIosFix" />
+    </js-module>
+
+    <platform name="ios">
+
+        <config-file target="config.xml" parent="/*">
+            <feature name="ColdStartIosFix">
+                <param name="ios-package" value="ColdStartIosFix" />
+            </feature>
+        </config-file>
+
+        <source-file src="src/ios/ColdStartIosFix.swift" />
+        <source-file src="src/ios/AppSceneDelegate.swift" />
+
+        <!--
+            Point the app's Scene Delegate to our subclass so we can buffer
+            the cold-launch URL. AppSceneDelegate itself subclasses
+            CDVSceneDelegate and calls super, so all normal Cordova Scene
+            behaviour is preserved.
+        -->
+        <edit-config target="UIApplicationSceneManifest/UISceneConfigurations/UIWindowSceneSessionRoleApplication/0/UISceneDelegateClassName"
+                     file="*-Info.plist"
+                     mode="merge">
+            <string>$(PRODUCT_MODULE_NAME).AppSceneDelegate</string>
+        </edit-config>
+
+    </platform>
+
+</plugin>
