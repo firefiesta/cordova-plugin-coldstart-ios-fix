@@ -53,7 +53,7 @@ public class ColdStartIosFix: CDVPlugin {
         }
 
         let result = CDVPluginResult(status: .ok, messageAs: url.absoluteString)
-        result?.setKeepCallbackAs(true)
+        result.setKeepCallbackAs(true)
         self.commandDelegate.send(result, callbackId: callbackId)
     }
 }
