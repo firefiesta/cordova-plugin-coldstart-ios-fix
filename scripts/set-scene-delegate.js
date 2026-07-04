@@ -14,17 +14,28 @@
  * `cordova prepare` and rewrites the generated Info.plist directly,
  * pointing the Scene Delegate class at AppSceneDelegate (this plugin's
  * CDVSceneDelegate subclass) instead of the default generated SceneDelegate.
+ *
+ * Deliberately dependency-free: rather than pulling in a plist-parsing
+ * npm package (which needs its own `npm install` step inside the plugin
+ * folder — not guaranteed to happen the same way across every install
+ * method: local path, git URL, npm registry, CI), this does a targeted
+ * text replacement using only Node's built-in `fs`/`path`. That value is
+ * fully predictable Apple plist XML, so a regex is enough and this works
+ * the instant the plugin is installed, with zero extra steps.
  */
 
 const fs = require('fs');
 const path = require('path');
 
-module.exports = function (context) {
-    const plist = requirePlist(context);
-    if (!plist) {
-        return;
-    }
+// Matches: <key>UISceneDelegateClassName</key> ... <string>XYZ.SceneDelegate</string>
+// Captures the module-name prefix so we can rebuild "<prefix>.AppSceneDelegate".
+// Only matches entries still pointing at the default "*.SceneDelegate" class,
+// so re-running this hook (or running it after it already patched the file)
+// is a no-op instead of double-appending "AppSceneDelegate.AppSceneDelegate".
+const SCENE_DELEGATE_PATTERN =
+    /(<key>\s*UISceneDelegateClassName\s*<\/key>\s*<string>)([^<]*?)\.SceneDelegate(\s*<\/string>)/g;
 
+module.exports = function (context) {
     const projectRoot = context.opts.projectRoot;
     const iosPlatformRoot = path.join(projectRoot, 'platforms', 'ios');
 
@@ -39,67 +50,28 @@ module.exports = function (context) {
         return;
     }
 
-    let data;
-    try {
-        data = plist.parse(fs.readFileSync(infoPlistPath, 'utf8'));
-    } catch (err) {
-        console.warn('[cordova-plugin-coldstart-ios-fix] Failed to parse Info.plist: ' + err.message);
-        return;
-    }
+    const original = fs.readFileSync(infoPlistPath, 'utf8');
+    let matchCount = 0;
 
-    const manifest = data.UIApplicationSceneManifest;
-    const configs = manifest &&
-        manifest.UISceneConfigurations &&
-        manifest.UISceneConfigurations.UIWindowSceneSessionRoleApplication;
-
-    if (!Array.isArray(configs)) {
-        console.warn('[cordova-plugin-coldstart-ios-fix] UIApplicationSceneManifest not found or unexpected shape, skipping.');
-        return;
-    }
-
-    let changed = false;
-
-    configs.forEach((sceneConfig) => {
-        const currentClass = sceneConfig.UISceneDelegateClassName;
-        if (typeof currentClass !== 'string') {
-            return;
-        }
-
-        // Only touch entries still pointing at the default generated
-        // SceneDelegate, so re-running this hook is idempotent and it
-        // won't clobber a class name some other plugin/dev intentionally set.
-        if (currentClass.endsWith('.SceneDelegate') || currentClass === 'SceneDelegate') {
-            const moduleName = currentClass.includes('.')
-                ? currentClass.substring(0, currentClass.lastIndexOf('.'))
-                : '$(PRODUCT_MODULE_NAME)';
-
-            sceneConfig.UISceneDelegateClassName = moduleName + '.AppSceneDelegate';
-            changed = true;
-        }
+    const patched = original.replace(SCENE_DELEGATE_PATTERN, (full, prefix, moduleName, suffix) => {
+        matchCount++;
+        return `${prefix}${moduleName}.AppSceneDelegate${suffix}`;
     });
 
-    if (!changed) {
-        console.log('[cordova-plugin-coldstart-ios-fix] UISceneDelegateClassName already set to AppSceneDelegate (or no matching entry found) — no changes made.');
+    if (matchCount === 0) {
+        console.log(
+            '[cordova-plugin-coldstart-ios-fix] No "*.SceneDelegate" entry found in Info.plist ' +
+            '(already patched, or an unexpected Info.plist structure) — no changes made.'
+        );
         return;
     }
 
-    fs.writeFileSync(infoPlistPath, plist.build(data));
-    console.log('[cordova-plugin-coldstart-ios-fix] Patched UISceneDelegateClassName -> AppSceneDelegate in ' + infoPlistPath);
+    fs.writeFileSync(infoPlistPath, patched);
+    console.log(
+        `[cordova-plugin-coldstart-ios-fix] Patched ${matchCount} UISceneDelegateClassName entr${matchCount === 1 ? 'y' : 'ies'} ` +
+        `-> AppSceneDelegate in ${infoPlistPath}`
+    );
 };
-
-function requirePlist(context) {
-    try {
-        // Installed as a dependency of this plugin's own package.json —
-        // Cordova runs `npm install` inside the plugin folder on add.
-        return require('plist');
-    } catch (err) {
-        console.warn(
-            '[cordova-plugin-coldstart-ios-fix] Could not load the "plist" module (' + err.message + '). ' +
-            'Try running `npm install` inside plugins/cordova-plugin-coldstart-ios-fix, or reinstalling the plugin.'
-        );
-        return null;
-    }
-}
 
 function findInfoPlist(iosPlatformRoot) {
     // cordova-ios 8+: platforms/ios/App/App-Info.plist

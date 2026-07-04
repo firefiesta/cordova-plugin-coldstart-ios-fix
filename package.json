@@ -29,8 +29,5 @@
   "bugs": {
     "url": "https://github.com/firefiesta/cordova-plugin-coldstart-ios-fix/issues"
   },
-  "homepage": "https://github.com/firefiesta/cordova-plugin-coldstart-ios-fix#readme",
-  "dependencies": {
-    "plist": "^3.1.0"
-  }
+  "homepage": "https://github.com/firefiesta/cordova-plugin-coldstart-ios-fix#readme"
 }

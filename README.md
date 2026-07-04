@@ -177,10 +177,12 @@ array changes get merged/concatenated rather than overwritten. This is a
 long-standing, acknowledged limitation, not a guess — see
 [apache/cordova-ios#613](https://github.com/apache/cordova-ios/issues/613)
 and [CB-13496](https://issues.apache.org/jira/browse/CB-13496). The hook
-sidesteps it entirely by reading and rewriting the compiled plist with the
-[`plist`](https://www.npmjs.com/package/plist) npm package (declared as a
-dependency in this plugin's `package.json`, so Cordova installs it
-automatically when the plugin is added).
+sidesteps it entirely with a small, dependency-free text replacement: the
+`UISceneDelegateClassName` line in Apple's plist XML is fully predictable,
+so a targeted regex is enough — no plist-parsing npm package required, no
+extra `npm install` step, nothing that can silently fail to resolve
+depending on how the plugin was installed (local path, git URL, npm
+registry). It works the instant the plugin is added.
 
 The hook is idempotent — it only touches entries still pointing at the
 default `*.SceneDelegate` class name, so running `cordova prepare` multiple
